@@ -1,0 +1,26 @@
+# =============================================================================
+# DOCKER-COMPOSE.YML - LangGraph Studio with Docker
+# =============================================================================
+# This file allows running LangGraph Studio without local Python installation.
+# 
+# Usage (from WSL):
+#   cd /mnt/c/Users/S91003504/Desktop/"Data anaylst"
+#   docker-compose up --build
+#
+# Then open: http://localhost:8123
+# =============================================================================
+
+version: '3.8'
+
+services:
+  langgraph-studio:
+    build: .
+    ports:
+      - "8123:8000"
+    volumes:
+      - .:/app
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY:-}

@@ -1,0 +1,23 @@
+# =============================================================================
+# REQUIREMENTS.TXT - Project Dependencies
+# =============================================================================
+# This file lists all the Python packages needed to run the multi-agent
+# data analyst application. Install them with: pip install -r requirements.txt
+#
+# Each package serves a specific purpose in the system:
+# - langchain: Core framework for building LLM-powered applications
+# - langchain-openai: OpenAI-specific integrations for LangChain
+# - langgraph: Graph-based orchestration for multi-agent workflows
+# - streamlit: Web UI framework for building data apps
+# - plotly: Interactive charting library (better than matplotlib for web)
+# - pandas: Data manipulation and analysis
+# - python-dotenv: Load environment variables from .env file
+# =============================================================================
+
+langchain
+langchain-openai
+langgraph
+streamlit
+plotly
+pandas
+python-dotenv

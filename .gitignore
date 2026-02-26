@@ -4,3 +4,5 @@ __pycache__/
 *.pyo
 .env
 
+# Google Service Account credentials - NEVER commit these!
+credentials/*.json

@@ -8,16 +8,26 @@
 # - langchain: Core framework for building LLM-powered applications
 # - langchain-openai: OpenAI-specific integrations for LangChain
 # - langgraph: Graph-based orchestration for multi-agent workflows
+# - langchain-mcp-adapters: Loads MCP tools as LangChain-compatible tools
 # - streamlit: Web UI framework for building data apps
 # - plotly: Interactive charting library (better than matplotlib for web)
 # - pandas: Data manipulation and analysis
 # - python-dotenv: Load environment variables from .env file
+# - mcp: Model Context Protocol SDK for connecting to MCP servers
+#
+# NOTE: mcp-google-sheets is NOT listed here. It is installed and run
+# separately via uvx (part of the uv package manager). The MCP server
+# runs as a standalone local process that communicates via stdio transport.
+# Install uv with: pip install uv
+# Test the MCP server with: uvx mcp-google-sheets@latest
 # =============================================================================
 
 langchain
 langchain-openai
 langgraph
+langchain-mcp-adapters
 streamlit
 plotly
 pandas
 python-dotenv
+mcp

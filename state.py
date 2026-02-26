@@ -20,16 +20,18 @@ a shared state object. This pattern:
 
 HOW THE STATE FLOWS:
 -------------------
-User uploads CSV → schema_agent fills dataframe_summary
-User asks question → intent_agent fills parsed_intent
-                   → code_writer_agent fills generated_code
-                   → executor_agent fills execution_result & chart_json
-                   → narrative_agent fills narrative
-                   → critic_agent fills critique & critic_score
+User asks question    → mcp_sheets_agent uses tools to find & fetch data
+                      → mcp_sheets_agent fills csv_path, sheet_metadata, mcp_tool_calls
+                      → schema_agent fills dataframe_summary
+                      → intent_agent fills parsed_intent
+                      → code_writer_agent fills generated_code
+                      → executor_agent fills execution_result & chart_json
+                      → narrative_agent fills narrative
+                      → critic_agent fills critique & critic_score
 =============================================================================
 """
 
-from typing import TypedDict, Optional
+from typing import TypedDict, Optional, List
 
 
 class AnalystState(TypedDict, total=False):
@@ -51,19 +53,42 @@ class AnalystState(TypedDict, total=False):
     # INPUT DATA - Set by the Streamlit app before the graph runs
     # =========================================================================
     
+    user_question: str
+    # The raw question typed by the user in the Streamlit interface.
+    # This is the ONLY input the user provides - no URLs or sheet selection needed.
+    # The MCP agent will autonomously find the relevant data based on this question.
+    # Examples: "What are the top 5 products by sales?" or "Show me Q4 trends"
+    # WRITTEN BY: Streamlit app (app.py) from the text input
+    # READ BY: mcp_sheets_agent (to decide which data to fetch)
+    #          intent_agent (to understand what the user wants)
+    #          narrative_agent (to reference the original question in the explanation)
+    #          critic_agent (to evaluate if the answer matches the question)
+    
+    # =========================================================================
+    # MCP AGENT OUTPUT - Set by mcp_sheets_agent
+    # =========================================================================
+    
     csv_path: str
-    # The filesystem path to the uploaded CSV file.
-    # WRITTEN BY: Streamlit app (app.py) when user uploads a file
+    # The filesystem path to the CSV file containing the data to analyze.
+    # This is populated by the MCP agent after it autonomously fetches data.
+    # WRITTEN BY: mcp_sheets_agent (saves fetched sheet data to temp CSV)
     # READ BY: schema_agent (to load and analyze the CSV)
     #          executor_agent (passed to the generated code for data loading)
     
-    user_question: str
-    # The raw question typed by the user in the Streamlit interface.
-    # Examples: "What are the top 5 products by sales?" or "Show me monthly trends"
-    # WRITTEN BY: Streamlit app (app.py) from the text input
-    # READ BY: intent_agent (to understand what the user wants)
-    #          narrative_agent (to reference the original question in the explanation)
-    #          critic_agent (to evaluate if the answer matches the question)
+    sheet_metadata: str
+    # Human-readable information about what the MCP agent found and fetched.
+    # Includes: which spreadsheet, which tab, number of rows/columns, column names.
+    # WRITTEN BY: mcp_sheets_agent (describes what it retrieved)
+    # READ BY: Streamlit app (to display info about the fetched data)
+    # Example: "Data retrieved via MCP agent\nTool calls: 3\nSize: 1,234 rows × 5 columns"
+    
+    mcp_tool_calls: List[dict]
+    # A log of which MCP tools the agent called, in order, with their arguments.
+    # This is used to display the agent's reasoning process in the UI.
+    # Each entry is a dict with: {"tool": str, "args": dict, "result": str}
+    # WRITTEN BY: mcp_sheets_agent (logs each tool call during execution)
+    # READ BY: Streamlit app (to display the "MCP Tool Calls" expander section)
+    # Example: [{"tool": "search_spreadsheets", "args": {"query": "sales"}}, ...]
     
     # =========================================================================
     # SCHEMA UNDERSTANDING - Set by schema_agent

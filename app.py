@@ -85,89 +85,38 @@ st.markdown("""
         padding-top: 2rem;
         padding-bottom: 2rem;
     }
-    
-    /* Style the file uploader */
-    .uploadedFile {
-        font-size: 14px;
-    }
     </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# SIDEBAR: FILE UPLOAD AND DATA PREVIEW
+# SIDEBAR: MCP AGENT INFORMATION
 # =============================================================================
-# The sidebar is perfect for context that should always be visible.
-# Users can reference their data while asking questions.
-#
-# STREAMLIT COMPONENTS USED:
-# - st.sidebar: Context manager for sidebar content
-# - st.file_uploader: File upload widget
-# - st.dataframe: Interactive data table
-# - st.info/warning: Styled message boxes
+# The sidebar now explains how the autonomous MCP agent works.
+# No user input is required here - the agent finds data on its own.
 # =============================================================================
 
 with st.sidebar:
-    # Sidebar title
-    st.title("📁 Data Upload")
+    st.title("🔌 MCP Agent")
     
-    # File uploader widget
-    # - type=["csv"] restricts to CSV files only
-    # - help= provides a tooltip on hover
-    uploaded_file = st.file_uploader(
-        "Upload your CSV file",
-        type=["csv"],
-        help="Upload a CSV file to analyze. The file will be used for all questions."
-    )
+    st.markdown("""
+    **Autonomous Data Retrieval**
     
-    # Show data preview if a file is uploaded
-    # WHY PREVIEW HERE?
-    # Users need to see their data to ask good questions.
-    # Knowing column names helps them reference the right fields.
+    This app uses an AI agent with access to Google Sheets tools via MCP 
+    (Model Context Protocol).
     
-    if uploaded_file is not None:
-        # Visual separator
-        st.divider()
-        
-        # Success message confirming upload
-        st.success(f"✓ Loaded: {uploaded_file.name}")
-        
-        # Load and preview the data
-        # We read the CSV twice: once here for preview, once later for analysis.
-        # For large files, you might want to cache this.
-        try:
-            # Create a DataFrame for preview
-            preview_df = pd.read_csv(uploaded_file)
-            
-            # Show dataset dimensions
-            st.caption(f"📐 {len(preview_df):,} rows × {len(preview_df.columns)} columns")
-            
-            # Preview header
-            st.subheader("Data Preview")
-            
-            # Show first 5 rows
-            # use_container_width=True makes the table fill the sidebar width
-            st.dataframe(
-                preview_df.head(5),
-                use_container_width=True,
-                height=200  # Fixed height so it doesn't take too much space
-            )
-            
-            # Show column names for reference
-            # This helps users know what fields they can ask about
-            with st.expander("📋 Column Names"):
-                for column in preview_df.columns:
-                    st.code(column, language=None)
-            
-            # Reset file pointer so it can be read again later
-            # IMPORTANT: After reading a file, the pointer is at the end.
-            # We must seek(0) to reset it for future reads.
-            uploaded_file.seek(0)
-            
-        except Exception as error:
-            st.error(f"Error reading file: {str(error)}")
-    else:
-        # No file uploaded yet - show instructions
-        st.info("👆 Upload a CSV file to get started")
+    **How it works:**
+    1. You ask a question
+    2. The agent searches your Google Drive
+    3. It finds and fetches relevant data
+    4. The analysis pipeline runs
+    
+    *No URLs or sheet selection needed - the agent figures it out!*
+    """)
+    
+    st.divider()
+    
+    st.caption("💡 **Tip:** Be specific in your question to help the agent find the right data.")
+    st.caption("Example: \"Show me Q4 2024 sales by region from the sales report\"")
 
 # =============================================================================
 # MAIN AREA: TITLE AND DESCRIPTION
@@ -183,11 +132,11 @@ Welcome to your AI-powered data analyst! This application uses a team of
 specialized AI agents to analyze your data and answer questions in plain English.
 
 **How it works:**
-1. Upload a CSV file in the sidebar
-2. Ask a question about your data below
+1. Just ask a question about your data
+2. The MCP agent autonomously finds and fetches relevant Google Sheets data
 3. Get an interactive chart and explanation
 
-*Powered by LangGraph, OpenAI, and Plotly*
+*Powered by LangGraph, OpenAI, MCP (via Smithery), and Plotly*
 """)
 
 # Visual separator between description and input
@@ -229,48 +178,20 @@ with st.form(key="question_form"):
 # We validate inputs, run the multi-agent pipeline, and display results.
 #
 # ERROR HANDLING:
-# We check for required inputs before proceeding:
-# 1. Is a file uploaded?
-# 2. Is a question entered?
-#
-# If either is missing, we show a friendly warning instead of crashing.
+# We only check if a question was entered - the MCP agent handles finding data.
 # =============================================================================
 
 if submit_button:
     # =========================================================================
     # INPUT VALIDATION
     # =========================================================================
-    # Check that we have everything we need before running the pipeline.
+    # With the autonomous MCP agent, we only need the user's question.
+    # The agent will find and fetch relevant data on its own.
     # =========================================================================
-    
-    if uploaded_file is None:
-        st.warning("⚠️ Please upload a CSV file first.")
-        st.stop()  # Stop execution here
     
     if not user_question.strip():
         st.warning("⚠️ Please enter a question about your data.")
         st.stop()  # Stop execution here
-    
-    # =========================================================================
-    # SAVE UPLOADED FILE TO TEMP LOCATION
-    # =========================================================================
-    # Streamlit's uploaded file is in memory. We need to save it to disk
-    # so our agents can access it by path.
-    #
-    # WHY TEMP FILE?
-    # - We don't want to clutter the project directory with uploads
-    # - Temp files are automatically cleaned up by the OS
-    # - We get a consistent file path to pass to agents
-    #
-    # IMPORTANT: delete=False keeps the file after closing the handle
-    # We'll clean it up after the pipeline completes
-    # =========================================================================
-    
-    # Create a temporary file with .csv extension
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as temp_file:
-        # Write the uploaded content to the temp file
-        temp_file.write(uploaded_file.getvalue())
-        csv_path = temp_file.name  # Get the path for agents to use
     
     try:
         # =====================================================================
@@ -290,13 +211,17 @@ if submit_button:
             graph = build_graph()
             
             # Step 2: Prepare initial state
+            # The autonomous MCP agent only needs the user's question.
+            # It will search Google Sheets, find relevant data, and fetch it
+            # without any manual URL input from the user.
             initial_state = {
-                "csv_path": csv_path,
                 "user_question": user_question
             }
             
             # Step 3: Run the full pipeline
             # We show which agents are running for transparency
+            # MCP agent is first - it AUTONOMOUSLY finds and fetches data
+            st.write("🔌 **MCP Sheets Agent:** Searching for relevant data...")
             st.write("🔍 **Schema Agent:** Reading dataset structure...")
             st.write("🎯 **Intent Agent:** Understanding your question...")
             st.write("💻 **Code Writer Agent:** Generating analysis code...")
@@ -388,6 +313,54 @@ if submit_button:
             st.warning(f"**{critic_score}** - {critique}")
         
         # -----------------------------------------------------------------
+        # DISPLAY MCP TOOL CALLS (EXPANDABLE)
+        # -----------------------------------------------------------------
+        # This shows which MCP tools the agent called during data retrieval.
+        # This is the MOST IMPRESSIVE part of the demo - it reveals the
+        # agent's autonomous reasoning process.
+        #
+        # WHY SHOW TOOL CALLS?
+        # 1. EXPLAINABILITY: Users can see HOW the agent found their data.
+        #    This builds understanding of the AI's decision-making.
+        #
+        # 2. TRUST: When users can see the agent's reasoning, they trust
+        #    the results more. Opacity breeds suspicion.
+        #
+        # 3. DEBUGGING: If the agent fetches wrong data, users can see
+        #    which search or read call went wrong.
+        #
+        # 4. EDUCATION: Users learn what tools are available and how
+        #    the agent uses them - inspiring future questions.
+        #
+        # This is a key differentiator from "black box" AI systems.
+        # -----------------------------------------------------------------
+        
+        mcp_tool_calls = final_state.get("mcp_tool_calls", [])
+        
+        if mcp_tool_calls:
+            with st.expander("🔌 MCP Tool Calls", expanded=True):
+                st.markdown("**The agent autonomously called these tools:**")
+                
+                for i, call in enumerate(mcp_tool_calls, 1):
+                    tool_name = call.get("tool", "unknown")
+                    args = call.get("args", {})
+                    result = call.get("result", "")
+                    
+                    # Display each tool call as a step
+                    st.markdown(f"**Step {i}: `{tool_name}`**")
+                    
+                    # Show arguments if any
+                    if args:
+                        st.json(args)
+                    
+                    # Show result preview if available
+                    if result:
+                        st.caption(f"Result: {result}")
+                    
+                    if i < len(mcp_tool_calls):
+                        st.divider()
+        
+        # -----------------------------------------------------------------
         # OPTIONAL: SHOW TECHNICAL DETAILS (EXPANDABLE)
         # -----------------------------------------------------------------
         # For users who want to see what happened "under the hood",
@@ -417,21 +390,38 @@ if submit_button:
         # =====================================================================
         # If anything goes wrong during analysis, we display a friendly error.
         # We also show the technical error for debugging.
+        #
+        # Common errors with MCP/Google Sheets:
+        # - Sheet not accessible (not shared publicly)
+        # - Invalid sheet URL
+        # - Smithery authentication failed
+        # - Network timeout
         # =====================================================================
         
         st.error("❌ An error occurred during analysis")
+        
+        # Check for common MCP/Sheets errors and provide helpful guidance
+        error_msg = str(error).lower()
+        if "403" in error_msg or "access denied" in error_msg:
+            st.warning(
+                "💡 **Access Denied:** Make sure your Google Sheet is shared with "
+                "'Anyone with the link can view'."
+            )
+        elif "401" in error_msg or "auth" in error_msg:
+            st.warning(
+                "💡 **Authentication Failed:** Check your SMITHERY_API_KEY in .env"
+            )
+        elif "timeout" in error_msg:
+            st.warning(
+                "💡 **Timeout:** The request took too long. The sheet may be too large "
+                "or there may be a network issue."
+            )
+        
         st.exception(error)  # Shows the full stack trace
     
-    finally:
-        # =====================================================================
-        # CLEANUP: Delete the temporary file
-        # =====================================================================
-        # We always clean up the temp file, even if an error occurred.
-        # This prevents accumulation of temp files on the server.
-        # =====================================================================
-        
-        if os.path.exists(csv_path):
-            os.remove(csv_path)
+    # Note: No cleanup needed here. The mcp_sheets_agent saves to temp/fetched_sheet.csv
+    # which is overwritten on each analysis. This is intentional - see mcp_sheets_agent.py
+    # for explanation of the temp CSV approach.
 
 # =============================================================================
 # FOOTER
@@ -440,7 +430,7 @@ if submit_button:
 # =============================================================================
 
 st.divider()
-st.caption("Built with ❤️ using LangGraph, OpenAI, Streamlit, and Plotly")
+st.caption("Built with ❤️ using LangGraph, OpenAI, MCP (via Smithery), Streamlit, and Plotly")
 
 
 # =============================================================================
@@ -476,7 +466,8 @@ st.caption("Built with ❤️ using LangGraph, OpenAI, Streamlit, and Plotly")
 #
 # In this app:
 # - The form prevents analysis from running on every keystroke
-# - File handling uses a fresh temp file each time (stateless)
-# - We don't use session state because each analysis is independent
+# - The MCP agent autonomously finds and fetches data - no session state needed for URLs
+# - The MCP agent handles temp file management (saves to temp/fetched_sheet.csv)
+# - Tool calls are logged in the state for displaying agent reasoning in the UI
 #
 # =============================================================================

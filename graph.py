@@ -69,6 +69,10 @@ from langgraph.graph import StateGraph, START, END
 from state import AnalystState
 
 # Import all agent functions from their respective modules
+# NOTE: mcp_sheets_agent is imported first because it runs first in the pipeline.
+# It is the data acquisition layer that fetches Google Sheets data via MCP
+# and makes it available to all downstream agents as a local CSV file.
+from agents.mcp_sheets_agent import mcp_sheets_agent
 from agents.schema_agent import schema_agent
 from agents.intent_agent import intent_agent
 from agents.code_writer_agent import code_writer_agent
@@ -93,16 +97,30 @@ def build_graph():
     ----------
     graph = build_graph()
     initial_state = {
-        "csv_path": "/path/to/data.csv",
-        "user_question": "What are the top products?"
+        "user_question": "What are the top products by sales?"
     }
     final_state = graph.invoke(initial_state)
     print(final_state["narrative"])
     
     Graph Structure:
     ---------------
-    START → schema_agent → intent_agent → code_writer_agent → 
+    START → mcp_sheets_agent → schema_agent → intent_agent → code_writer_agent → 
             executor_agent → narrative_agent → critic_agent → END
+    
+    WHY MCP_SHEETS_AGENT COMES FIRST:
+    ---------------------------------
+    The MCP sheets agent is the AUTONOMOUS DATA ACQUISITION LAYER. It must run 
+    before any other agent because:
+    1. It uses MCP tools to SEARCH for relevant spreadsheets
+    2. It decides which spreadsheet and tab contains the relevant data
+    3. It fetches the data and saves it as a local CSV file
+    4. It populates csv_path in the state for downstream agents
+    
+    The agent is AUTONOMOUS - it only receives the user's question and figures
+    out everything else using tool calls to the MCP server.
+    
+    Without this agent running first, schema_agent would fail because there's
+    no CSV file to analyze.
     """
     
     # =========================================================================
@@ -137,6 +155,11 @@ def build_graph():
     # The order doesn't affect execution - that's determined by edges.
     # We add them in logical order for readability.
     # =========================================================================
+    
+    # Node 0: MCP Sheets Agent (DATA ACQUISITION - runs first)
+    # Fetches data from Google Sheets via MCP and saves it as a local CSV.
+    # This is the adapter layer between the MCP world and the pandas world.
+    workflow.add_node("mcp_sheets_agent", mcp_sheets_agent)
     
     # Node 1: Schema Agent
     # Analyzes the CSV structure and creates a summary
@@ -184,9 +207,13 @@ def build_graph():
     
     # Connect START to the first agent
     # This defines where execution begins when invoke() is called
-    workflow.add_edge(START, "schema_agent")
+    # MCP agent runs first to fetch Google Sheets data before any analysis
+    workflow.add_edge(START, "mcp_sheets_agent")
     
     # Connect agents in sequence
+    # mcp_sheets_agent → schema_agent: data must be fetched before analyzing schema
+    workflow.add_edge("mcp_sheets_agent", "schema_agent")
+    
     # schema_agent → intent_agent: schema must be extracted before parsing intent
     workflow.add_edge("schema_agent", "intent_agent")
     
